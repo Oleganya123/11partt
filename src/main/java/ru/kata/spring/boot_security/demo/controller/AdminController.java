@@ -45,17 +45,17 @@ public class AdminController {
             return "admin";
         }
 
-        if (roleIds != null && !roleIds.isEmpty()) {
-            Set<Role> roles = roleIds.stream()
-                    .map(roleId -> roleRepository.findById(roleId).orElseThrow())
-                    .collect(Collectors.toSet());
-            user.setRoles(roles);
-        } else {
-
-            Role userRole = roleRepository.findByName("USER")
-                    .orElseThrow(() -> new RuntimeException("Role USER not found"));
-            user.setRoles(Set.of(userRole));
+        if (roleIds == null || roleIds.isEmpty()) {
+            bindingResult.rejectValue("roles", "error.user", "Выберите хотя бы одну роль");
+            model.addAttribute("users", userService.getAllUsers());
+            model.addAttribute("allRoles", roleRepository.findAll());
+            return "admin";
         }
+
+        Set<Role> roles = roleIds.stream()
+                .map(roleId -> roleRepository.findById(roleId).orElseThrow())
+                .collect(Collectors.toSet());
+        user.setRoles(roles);
 
         userService.addUser(user);
         return "redirect:/admin/users";
@@ -69,6 +69,7 @@ public class AdminController {
                              @RequestParam String email,
                              @RequestParam(required = false) String password,
                              @RequestParam(required = false) List<Long> roleIds) {
+
         User user = userService.getUserById(id);
         user.setName(name);
         user.setLastName(lastName);
