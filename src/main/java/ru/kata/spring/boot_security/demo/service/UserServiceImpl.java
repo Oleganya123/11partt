@@ -16,16 +16,18 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
-public  class UserServiceImpl implements UserService {
+public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
 
     @Autowired
-    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, RoleRepository roleRepository) {
-        this.roleRepository = roleRepository;
+    public UserServiceImpl(UserRepository userRepository,
+                           PasswordEncoder passwordEncoder,
+                           RoleRepository roleRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.roleRepository = roleRepository;
     }
 
     @Override
@@ -44,25 +46,34 @@ public  class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public List<User> getAllUsers() {
-        return userRepository.findAll().stream()
-                .peek(user -> user.getRoles().size())
-                .collect(Collectors.toList());
+        return userRepository.findAll();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<Role> getAllRoles() {
+        return roleRepository.findAll();
+    }
 
     @Override
     @Transactional
-    public void addUser(User user) {
-        if (user.getRoles() == null || user.getRoles().isEmpty()) {
+    public void addUser(User user, List<Long> roleIds) {
+        if (roleIds == null || roleIds.isEmpty()) {
             throw new IllegalArgumentException("User must have at least one role");
         }
+
+        Set<Role> roles = roleIds.stream()
+                .map(roleId -> roleRepository.findById(roleId).orElseThrow())
+                .collect(Collectors.toSet());
+        user.setRoles(roles);
+
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         userRepository.save(user);
     }
 
     @Override
     @Transactional
-    public void updateUser(User user,String newPassword) {
+    public void updateUser(User user, String newPassword, List<Long> roleIds) {
         if (newPassword != null && !newPassword.isEmpty()) {
             user.setPassword(passwordEncoder.encode(newPassword));
         } else {
@@ -70,17 +81,19 @@ public  class UserServiceImpl implements UserService {
             user.setPassword(existingUser.getPassword());
         }
 
-        if (user.getRoles() == null || user.getRoles().isEmpty()) {
-            User existingUser = userRepository.findById(user.getId()).orElseThrow();
-            user.setRoles(existingUser.getRoles());
+        if (roleIds != null && !roleIds.isEmpty()) {
+            Set<Role> roles = roleIds.stream()
+                    .map(roleId -> roleRepository.findById(roleId).orElseThrow())
+                    .collect(Collectors.toSet());
+            user.setRoles(roles);
         }
+
         userRepository.save(user);
     }
 
-    @Transactional
     @Override
+    @Transactional
     public void deleteUser(Long id) {
         userRepository.deleteById(id);
     }
-
 }
